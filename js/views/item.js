@@ -1,7 +1,7 @@
 import * as store from '../store.js';
 import { h, icon, sheet, confirmSheet, field, toast, ago, shortDate, sparkline, pickFile, rater } from '../dom.js';
 import { GOALS, ACTIVITIES, GOAL_NOTE } from './list.js';
-import { songMap, transitionList, openOrderSheet } from '../songmap.js';
+import { songMap, transitionList, openOrderSheet, focusLine } from '../songmap.js';
 import { recordButton, clipList } from '../clips.js';
 
 const KIND_LABEL = { gp: 'Tab with playback', tex: 'Tab with playback', pdf: 'PDF', image: 'Image' };
@@ -194,6 +194,7 @@ export function render(root, { id }) {
     const map = isSong && item.goal !== 'casual' ? h('section', { class: 'group' },
       h('div', { class: 'group-head' }, h('h2', { class: 'group-title' }, 'Song map'),
         item.sections.length ? h('button', { class: 'btn small', onclick: () => openOrderSheet(item) }, 'Order') : null),
+      focusLine(item),
       songMap(item),
       joins ? h('h3', { class: 'sub' }, 'Transitions') : null,
       joins) : null;

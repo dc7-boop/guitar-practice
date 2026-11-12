@@ -4,7 +4,7 @@ import { h, icon, toast, rater, clock } from '../dom.js';
 import { metronome, keepAwake } from '../metronome.js';
 import { mountFace } from '../face.js';
 import { recordButton } from '../clips.js';
-import { songMap, changesList } from '../songmap.js';
+import { songMap, changesList, focusLine } from '../songmap.js';
 import { cardLink } from '../cards.js';
 
 // One block of today's session: a countdown, whatever that block needs, and a rating at the end.
@@ -139,13 +139,13 @@ export async function render(root, { id }) {
   } else if (b.kind === 'song' && item) {
     const songsterr = item.links.find((l) => /songsterr\.com/i.test(l.url)) || item.links[0];
     const mapHolder = h('div');
-    const drawMap = () => mapHolder.replaceChildren(item.goal === 'casual'
-      ? h('p', { class: 'muted hint' }, 'A casual song: no map, just play around with it.')
-      : songMap(item));
+    const drawMap = () => mapHolder.replaceChildren(...(item.goal === 'casual'
+      ? [h('p', { class: 'muted hint' }, 'A casual song: no map, just play around with it.')]
+      : [focusLine(item), songMap(item)].filter(Boolean)));
     drawMap();
     cleanups.push(store.subscribe(drawMap));
     body.append(
-      h('p', { class: 'muted small' }, 'Tap a section, or the join between two, to rate it.'),
+      h('p', { class: 'muted small' }, 'Tap a section to rate it or mark it as the one you’re working on. Tap a join to rate the change.'),
       mapHolder,
       h('div', { class: 'row gap wrap' },
         songsterr ? h('a', { class: 'btn', href: songsterr.url, target: '_blank', rel: 'noopener noreferrer' }, icon('note', 18), 'Open the tab') : null,

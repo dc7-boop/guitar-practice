@@ -210,9 +210,11 @@ export function mapStrip(form, transitions, onSection, onJoin) {
         ? h('button', { class: cls, 'aria-label': `${tr.from.name} into ${tr.to.name}: ${RATING_LABEL[tr.state.rating] || 'not rated'}`, onclick: () => onJoin(tr) })
         : h('span', { class: cls }));
     }
-    const cls = 'part ' + (section.rating || '');
+    const cls = 'part ' + (section.rating || '') + (section.focus ? ' focus' : '');
+    const fb = section.focus ? section.focusBars : null;
     strip.append(onSection
-      ? h('button', { class: cls, onclick: () => onSection(section) }, section.name)
+      ? h('button', { class: cls, onclick: () => onSection(section) }, section.name,
+          fb ? h('small', null, fb.from === fb.to ? ` ${fb.from}` : ` ${fb.from}–${fb.to}`) : null)
       : h('span', { class: cls, title: section.name }));
   });
   return strip;

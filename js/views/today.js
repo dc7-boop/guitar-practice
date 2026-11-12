@@ -2,6 +2,7 @@ import * as store from '../store.js';
 import * as session from '../session.js';
 import { h, icon, confirmSheet, toast, RATING_LABEL } from '../dom.js';
 import { cardLink } from '../cards.js';
+import { focusOf, focusText } from '../songmap.js';
 
 const KIND_NOTE = { exercise: 'With the metronome', song: 'Song', changes: 'Your problem changes', improv: 'Your own backing track' };
 
@@ -9,6 +10,7 @@ function blockRow(b, redraw) {
   const item = b.ref ? store.getItem(b.ref) : null;
   let note = KIND_NOTE[b.kind];
   if (b.kind === 'song') note = b.rotation ? 'From your rotation' : item && item.artist ? item.artist : 'Song';
+  if (b.kind === 'song' && item && focusOf(item).length) note = focusOf(item).map(focusText).join(' · ');
   if (b.kind === 'changes') {
     const n = store.getChanges().length;
     note = n ? `${n} on your list` : 'Nothing on your list yet';

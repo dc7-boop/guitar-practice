@@ -1,6 +1,6 @@
 // Offline support. The app shell is fetched fresh when there is a connection and
 // served from the cache when there isn't; the large player libraries are cached once.
-const VERSION = 'v2.0.0';
+const VERSION = 'v2.1.0';
 const SHELL = `shell-${VERSION}`;
 const VENDOR = 'vendor-v1';
 

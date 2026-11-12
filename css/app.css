@@ -644,3 +644,17 @@ a.card.pad { display: flex; }
   .pm-arm { transition: none !important; }
   .pulse-ring { animation: none !important; }
 }
+
+/* ---- working-on sections and the bar picker ---- */
+
+.map .part.focus { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4.5px var(--accent); }
+.map .part small { font-size: 0.78rem; font-weight: 600; opacity: 0.85; }
+.map.mini .part.focus { box-shadow: 0 0 0 1.5px var(--accent); }
+.focus-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.focus-line strong { font-weight: 650; }
+.bar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
+.bar-cell {
+  min-height: 46px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--surface-2);
+  color: var(--text); font: inherit; font-weight: 650; font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation;
+}
+.bar-cell.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
