@@ -2,6 +2,7 @@ import * as store from '../store.js';
 import { h, icon, toast } from '../dom.js';
 import { metronome, tapTempo } from '../metronome.js';
 import { openLogSheet } from '../log.js';
+import { mountFace, FACE_STYLES } from '../face.js';
 
 const SUBS = [[1, 'Quarters'], [2, 'Eighths'], [3, 'Triplets'], [4, '16ths']];
 
@@ -10,7 +11,10 @@ function persist() {
   store.setSetting('metronome', { bpm, beats, sub, accent, volume });
 }
 
-export function render(root, { query }) {
+export async function render(root, { query }) {
+  let style = await store.getSetting('metroStyle', 'pendulum');
+  const face = mountFace(style);
+  const styleSeg = h('div', { class: 'seg' });
   const item = query.get('item') ? store.getItem(query.get('item')) : null;
   const section = item ? item.sections.find((s) => s.id === query.get('section')) : null;
 
@@ -21,7 +25,6 @@ export function render(root, { query }) {
   }
 
   const bpmEl = h('div', { class: 'bpm-num', 'aria-live': 'off' });
-  const dots = h('div', { class: 'dots', 'aria-hidden': 'true' });
   const slider = h('input', { type: 'range', min: 30, max: 260, step: 1, 'aria-label': 'Tempo', oninput: () => metronome.setBpm(Number(slider.value)) });
   const startBtn = h('button', { class: 'btn primary start', onclick: () => metronome.toggle() });
   const beatsEl = h('span', { class: 'num' });
@@ -56,9 +59,12 @@ export function render(root, { query }) {
     accentBox.checked = metronome.accent;
     volume.value = metronome.volume;
     subSeg.replaceChildren(...SUBS.map(([n, label]) => h('button', { class: metronome.sub === n ? 'on' : '', onclick: () => metronome.set({ sub: n }) }, label)));
-    if (dots.children.length !== metronome.beats) {
-      dots.replaceChildren(...Array.from({ length: metronome.beats }, () => h('span', { class: 'dot' })));
-    }
+    styleSeg.replaceChildren(...FACE_STYLES.map(([key, label]) => h('button', { class: style === key ? 'on' : '', onclick: () => {
+      style = key;
+      store.setSetting('metroStyle', key);
+      face.use(key);
+      draw();
+    } }, label)));
     logBtn.replaceChildren(icon('check', 20), section ? `Log ${metronome.bpm} bpm as clean` : 'Log this tempo…');
   }
 
@@ -73,16 +79,7 @@ export function render(root, { query }) {
   });
 
   const off = metronome.on((type, detail) => {
-    if (type === 'tick') {
-      if (!detail.isBeat) return;
-      const dot = dots.children[detail.beat];
-      if (!dot) return;
-      for (const d of dots.children) d.classList.remove('on');
-      dot.classList.add('on');
-      dot.classList.toggle('down', detail.isDownbeat);
-      return;
-    }
-    if (type === 'state' && !metronome.running) for (const d of dots.children) d.classList.remove('on');
+    if (type === 'tick') return;
     if (type === 'change') persist();
     draw();
   });
@@ -98,7 +95,7 @@ export function render(root, { query }) {
   root.classList.add('metronome-view');
   root.append(
     section ? context : h('header', { class: 'page-head' }, h('h1', null, 'Metronome')),
-    h('div', { class: 'metro-face' }, bpmEl, dots),
+    h('div', { class: 'metro-face' }, face.el, bpmEl),
     h('div', { class: 'tempo-row' }, step(-5), step(-1), slider, step(1), step(5)),
     h('div', { class: 'row gap metro-actions' },
       startBtn,
@@ -110,6 +107,7 @@ export function render(root, { query }) {
           h('button', { class: 'btn step', 'aria-label': 'Fewer beats', onclick: () => metronome.set({ beats: Math.max(1, metronome.beats - 1) }) }, '−'),
           beatsEl,
           h('button', { class: 'btn step', 'aria-label': 'More beats', onclick: () => metronome.set({ beats: Math.min(12, metronome.beats + 1) }) }, '+'))),
+      h('div', { class: 'option col' }, h('span', null, 'Look'), styleSeg),
       h('div', { class: 'option col' }, h('span', null, 'Clicks'), subSeg),
       h('label', { class: 'option' }, h('span', null, 'Accent the first beat'), accentBox),
       h('label', { class: 'option' }, h('span', null, 'Volume'), volume))
@@ -119,6 +117,7 @@ export function render(root, { query }) {
 
   return () => {
     off();
+    face.off();
     document.removeEventListener('keydown', onKey);
     if (section && section.lastBpm !== metronome.bpm) {
       section.lastBpm = metronome.bpm;

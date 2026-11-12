@@ -52,12 +52,86 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
-export async function init() {
-  items = (await tx('items', 'readonly', (s) => s.getAll())) || [];
+// Records written by older versions are filled in here, never rewritten on disk until next saved.
+function normalize(rec) {
+  if (rec.type === 'song' || rec.type === 'exercise') {
+    if (!rec.activity) rec.activity = rec.status === 'shelved' ? 'shelved' : rec.status === 'maintaining' ? 'rotation' : 'active';
+    if (rec.type === 'song' && !rec.goal) rec.goal = 'recording';
+    rec.sections = rec.sections || [];
+    rec.links = rec.links || [];
+    rec.files = rec.files || [];
+    rec.clips = rec.clips || [];
+    rec.transitions = rec.transitions || {};
+    for (const s of rec.sections) {
+      s.log = s.log || [];
+      s.ratings = s.ratings || [];
+    }
+  }
+  if (rec.type === 'change') rec.ratings = rec.ratings || [];
+  return rec;
 }
 
+export async function init() {
+  items = ((await tx('items', 'readonly', (s) => s.getAll())) || []).map(normalize);
+}
+
+// Songs and exercises. Chord changes and past sessions share the store but have their own getters.
 export function getItems() {
-  return items;
+  return items.filter((i) => i.type === 'song' || i.type === 'exercise');
+}
+
+export function getChanges() {
+  return items.filter((i) => i.type === 'change').sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+export function getSessions() {
+  return items.filter((i) => i.type === 'session').sort((a, b) => a.t.localeCompare(b.t));
+}
+
+export async function addChange(title) {
+  return saveItem({ id: uid(), type: 'change', title, rating: null, ratings: [], createdAt: new Date().toISOString() });
+}
+
+export async function removeRecord(id) {
+  items = items.filter((i) => i.id !== id);
+  await tx('items', 'readwrite', (s) => s.delete(id));
+  emit();
+}
+
+// ---- ratings: rough, ok, clean ----
+
+export const RATINGS = [['rough', 'Rough'], ['ok', 'Okay'], ['clean', 'Clean']];
+
+// target is anything that carries { rating, ratings[] }: a section, a transition, a chord change.
+export function setRating(target, rating) {
+  target.rating = rating;
+  (target.ratings = target.ratings || []).push({ t: new Date().toISOString(), r: rating });
+}
+
+// ---- song maps ----
+
+// The order the sections are played in. Without a saved order, it is the section list itself.
+export function songForm(item) {
+  const ids = new Set(item.sections.map((s) => s.id));
+  const form = (item.form || []).filter((id) => ids.has(id));
+  return form.length ? form : item.sections.map((s) => s.id);
+}
+
+// Each distinct move from one section to a different one, in the order it first happens.
+export function songTransitions(item) {
+  const form = songForm(item);
+  const seen = new Set();
+  const out = [];
+  for (let i = 0; i < form.length - 1; i++) {
+    const key = `${form[i]}>${form[i + 1]}`;
+    if (form[i] === form[i + 1] || seen.has(key)) continue;
+    seen.add(key);
+    const from = item.sections.find((s) => s.id === form[i]);
+    const to = item.sections.find((s) => s.id === form[i + 1]);
+    item.transitions[key] = item.transitions[key] || { rating: null, ratings: [] };
+    out.push({ key, from, to, state: item.transitions[key] });
+  }
+  return out;
 }
 
 export function getItem(id) {
@@ -89,10 +163,16 @@ export function newItem({ type = 'song', title, artist = '' }) {
     title,
     artist,
     status: 'learning',
+    activity: 'active',
+    goal: type === 'song' ? 'recording' : undefined,
+    warmup: false,
     notes: '',
     sections: [],
+    form: [],
+    transitions: {},
     links: [],
     files: [],
+    clips: [],
     createdAt: new Date().toISOString(),
     lastPracticedAt: null,
   };
@@ -101,7 +181,7 @@ export function newItem({ type = 'song', title, artist = '' }) {
 export async function deleteItem(id) {
   const item = getItem(id);
   if (!item) return;
-  for (const f of item.files || []) await tx('files', 'readwrite', (s) => s.delete(f.id));
+  for (const f of [...(item.files || []), ...(item.clips || [])]) await tx('files', 'readwrite', (s) => s.delete(f.id));
   items = items.filter((i) => i.id !== id);
   await tx('items', 'readwrite', (s) => s.delete(id));
   emit();
@@ -111,7 +191,7 @@ export async function deleteItem(id) {
 
 export async function addSection(itemId, { name, targetBpm = null }) {
   const item = getItem(itemId);
-  const section = { id: uid(), name, targetBpm, log: [], lastBpm: null };
+  const section = { id: uid(), name, targetBpm, log: [], lastBpm: null, rating: null, ratings: [] };
   item.sections.push(section);
   await saveItem(item);
   return section;
@@ -174,6 +254,24 @@ export async function deleteFile(itemId, fileId) {
   await saveItem(item);
 }
 
+// ---- recorded clips ----
+
+export async function addClip(itemId, { data, mime, seconds }) {
+  const item = getItem(itemId);
+  const meta = { id: uid(), t: new Date().toISOString(), mime, seconds };
+  await tx('files', 'readwrite', (s) => s.put({ id: meta.id, data }));
+  item.clips.push(meta);
+  await saveItem(item);
+  return meta;
+}
+
+export async function deleteClip(itemId, clipId) {
+  const item = getItem(itemId);
+  item.clips = item.clips.filter((c) => c.id !== clipId);
+  await tx('files', 'readwrite', (s) => s.delete(clipId));
+  await saveItem(item);
+}
+
 // ---- settings ----
 
 export async function getSetting(key, fallback = null) {
@@ -207,7 +305,7 @@ function base64ToBuf(b64) {
 export async function exportBackup() {
   const files = [];
   for (const item of items) {
-    for (const f of item.files || []) {
+    for (const f of [...(item.files || []), ...(item.clips || [])]) {
       const data = await getFileData(f.id);
       if (data) files.push({ id: f.id, data: bufToBase64(data) });
     }
@@ -230,11 +328,12 @@ export async function importBackup(backup) {
     await tx('files', 'readwrite', (s) => s.put({ id: f.id, data: base64ToBuf(f.data) }));
   }
   for (const item of backup.items) {
+    normalize(item);
     const i = items.findIndex((x) => x.id === item.id);
     if (i >= 0) items[i] = item;
     else items.push(item);
     await tx('items', 'readwrite', (s) => s.put(item));
   }
   emit();
-  return backup.items.length;
+  return backup.items.filter((i) => i.type === 'song' || i.type === 'exercise').length;
 }

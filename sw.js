@@ -1,6 +1,6 @@
 // Offline support. The app shell is fetched fresh when there is a connection and
 // served from the cache when there isn't; the large player libraries are cached once.
-const VERSION = 'v1.0.0';
+const VERSION = 'v2.0.0';
 const SHELL = `shell-${VERSION}`;
 const VENDOR = 'vendor-v1';
 
@@ -16,7 +16,16 @@ const SHELL_FILES = [
   'js/metronome.js',
   'js/log.js',
   'js/demo.js',
+  'js/library.js',
+  'js/session.js',
+  'js/face.js',
+  'js/clips.js',
+  'js/cards.js',
+  'js/songmap.js',
   'js/views/list.js',
+  'js/views/today.js',
+  'js/views/block.js',
+  'js/views/stats.js',
   'js/views/item.js',
   'js/views/metronome.js',
   'js/views/player.js',

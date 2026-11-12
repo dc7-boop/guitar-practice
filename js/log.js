@@ -4,7 +4,7 @@ import { h, sheet, field, toast } from './dom.js';
 // "Log a tempo" sheet, used from the metronome, the tab player and the page viewer.
 // itemId is optional: with it the song is fixed, without it you choose one.
 export function openLogSheet({ itemId = null, sectionId = null, bpm = 80, suggestName = '', onDone = null } = {}) {
-  const items = store.getItems().filter((i) => i.status !== 'shelved' || i.id === itemId);
+  const items = store.getItems().filter((i) => i.activity !== 'shelved' || i.id === itemId);
   if (!items.length) {
     toast('Add a song or exercise first');
     return;

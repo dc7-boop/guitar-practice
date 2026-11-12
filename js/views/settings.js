@@ -1,6 +1,5 @@
 import * as store from '../store.js';
 import { h, toast, downloadBlob, pickFile, shortDate } from '../dom.js';
-import { addDemo } from '../demo.js';
 import { APP_VERSION } from '../version.js';
 
 export async function render(root) {
@@ -23,7 +22,7 @@ export async function render(root) {
     h('section', { class: 'group' },
       h('h2', { class: 'group-title' }, 'Backup and moving devices'),
       h('div', { class: 'card pad stack' },
-        h('p', null, 'Everything lives on this device. A backup file holds your whole list, tempo history and uploaded tabs. To move to a new phone or tablet, save a backup here and load it there.'),
+        h('p', null, 'Everything lives on this device. A backup file holds your songs, exercises, ratings, tempo history, sessions, clips and uploaded tabs. To move to a new phone or tablet, save a backup here and load it there.'),
         h('div', { class: 'row gap wrap' },
           h('button', {
             class: 'btn primary',
@@ -72,15 +71,7 @@ export async function render(root) {
       h('h2', { class: 'group-title' }, 'Finding tabs'),
       h('div', { class: 'card pad stack' },
         h('p', null, 'The player reads Guitar Pro files (.gp, .gp3, .gp4, .gp5, .gpx) and MusicXML. Tab sites that offer a "Guitar Pro" version of a song usually have a download button for the file. Save it to this device, then add it to a song with the File button.'),
-        h('p', { class: 'muted small' }, 'PDFs and photos of paper tabs work too. They open as pages with a metronome, without playback.'),
-        h('div', null, h('button', {
-          class: 'btn',
-          onclick: async () => {
-            const item = await addDemo();
-            toast('Demo exercise added');
-            location.hash = `#/item/${item.id}`;
-          },
-        }, 'Add the demo exercise')))),
+        h('p', { class: 'muted small' }, 'PDFs and photos of paper tabs work too. They open as pages with a metronome, without playback.'))),
 
     h('p', { class: 'muted small pad' }, `Guitar Practice ${APP_VERSION}. Tab rendering and playback by alphaTab; PDF pages by PDF.js.`)
   );

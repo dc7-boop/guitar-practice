@@ -2,6 +2,10 @@ import * as store from './store.js';
 import { h, icon } from './dom.js';
 import { metronome, keepAwake } from './metronome.js';
 import * as listView from './views/list.js';
+import * as todayView from './views/today.js';
+import * as blockView from './views/block.js';
+import * as statsView from './views/stats.js';
+import { syncLibrary } from './library.js';
 import * as itemView from './views/item.js';
 import * as metronomeView from './views/metronome.js';
 import * as playerView from './views/player.js';
@@ -9,7 +13,10 @@ import * as viewerView from './views/viewer.js';
 import * as settingsView from './views/settings.js';
 
 const routes = [
-  { match: /^\/$/, view: listView, nav: 'list' },
+  { match: /^\/$/, view: todayView, nav: 'today' },
+  { match: /^\/block\/([^/]+)$/, view: blockView, nav: 'today' },
+  { match: /^\/library$/, view: listView, nav: 'list' },
+  { match: /^\/stats$/, view: statsView, nav: 'stats' },
   { match: /^\/item\/([^/]+)$/, view: itemView, nav: 'list' },
   { match: /^\/metronome$/, view: metronomeView, nav: 'metronome' },
   { match: /^\/play\/([^/]+)$/, view: playerView, nav: null },
@@ -33,8 +40,10 @@ function renderNav(active) {
   document.body.classList.toggle('immersive', active === null);
   navEl.replaceChildren(
     ...[
-      ['list', '#/', 'Practice', 'list'],
+      ['today', '#/', 'Today', 'today'],
+      ['list', '#/library', 'Library', 'note'],
       ['metronome', '#/metronome', 'Metronome', 'metronome'],
+      ['stats', '#/stats', 'Stats', 'stats'],
       ['settings', '#/settings', 'Settings', 'settings'],
     ].map(([key, href, label, ic]) =>
       h('a', { href, class: 'nav-link' + (key === active ? ' active' : ''), 'aria-current': key === active ? 'page' : null }, icon(ic, 24), h('span', null, label))
@@ -51,7 +60,7 @@ async function route() {
   const hit = routes.find((r) => r.match.test(path)) || routes[0];
   const params = path.match(hit.match) || [];
   // The metronome keeps running only on screens that show its controls.
-  if (hit.view !== metronomeView && hit.view !== viewerView && metronome.running) metronome.stop();
+  if (hit.view !== metronomeView && hit.view !== viewerView && hit.view !== blockView && metronome.running) metronome.stop();
   current = hit;
   renderNav(hit.nav);
   viewEl.replaceChildren();
@@ -73,6 +82,7 @@ metronome.on((type) => {
 
 async function boot() {
   await store.init();
+  await syncLibrary();
   const saved = await store.getSetting('metronome');
   if (saved) metronome.set(saved);
   window.addEventListener('hashchange', route);

@@ -46,6 +46,12 @@ const ICONS = {
   zoomOut: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.300M8.500 11h5"/>',
   chevron: '<path d="M9 5l7 7-7 7"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.500 6.500l4 4"/>',
+  today: '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M8 3v4M16 3v4M8.5 13l2.5 2.500 4.500-5"/>',
+  stats: '<path d="M5 20V11M12 20V4M19 20v-6"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.500 11a6.500 6.500 0 0013 0M12 17.500V21"/>',
+  swap: '<path d="M7 4L3 8l4 4"/><path d="M3 8h13a4 4 0 014 4"/><path d="M17 20l4-4-4-4"/><path d="M21 16H8a4 4 0 01-4-4"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.500 9.500a2.500 2.500 0 114 2c-.9.600-1.500 1.200-1.500 2.300"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>',
   note: '<path d="M9 18V5l11-2v13"/><circle cx="6.500" cy="18" r="2.500"/><circle cx="17.500" cy="16" r="2.500"/>',
 };
 
@@ -180,4 +186,65 @@ export function pickFile(accept) {
     document.body.append(input);
     input.click();
   });
+}
+
+// ---- ratings ----
+
+export const RATING_LABEL = { rough: 'Rough', ok: 'Okay', clean: 'Clean' };
+
+// Three buttons: Rough, Okay, Clean. The current one is filled in.
+export function rater(current, onPick, { small = false } = {}) {
+  return h('div', { class: 'rater' + (small ? ' small' : ''), role: 'group', 'aria-label': 'How did it go?' },
+    Object.entries(RATING_LABEL).map(([key, label]) =>
+      h('button', { type: 'button', class: `rate ${key}` + (current === key ? ' on' : ''), 'aria-pressed': current === key ? 'true' : 'false', onclick: () => onPick(key) }, label)));
+}
+
+// A song drawn as its sections in playing order, coloured by rating, with the joins between them.
+export function mapStrip(form, transitions, onSection, onJoin) {
+  const strip = h('div', { class: 'map' + (onSection ? '' : ' mini') });
+  form.forEach((section, i) => {
+    if (i > 0) {
+      const tr = transitions.find((t) => t.from.id === form[i - 1].id && t.to.id === section.id);
+      const cls = 'join ' + (tr && tr.state.rating ? tr.state.rating : '');
+      strip.append(tr && onJoin
+        ? h('button', { class: cls, 'aria-label': `${tr.from.name} into ${tr.to.name}: ${RATING_LABEL[tr.state.rating] || 'not rated'}`, onclick: () => onJoin(tr) })
+        : h('span', { class: cls }));
+    }
+    const cls = 'part ' + (section.rating || '');
+    strip.append(onSection
+      ? h('button', { class: cls, onclick: () => onSection(section) }, section.name)
+      : h('span', { class: cls, title: section.name }));
+  });
+  return strip;
+}
+
+// A larger line chart: values over time, with an optional dashed target.
+export function lineChart(points, { target = null, width = 320, height = 110, unit = '' } = {}) {
+  if (!points.length) return null;
+  const values = points.map((p) => p.v);
+  const max = Math.max(...values, target || 0);
+  const min = Math.min(...values);
+  const span = Math.max(1, max - min);
+  const padX = 8, padTop = 16, padBottom = 18;
+  const x = (i) => (points.length === 1 ? width / 2 : padX + (i * (width - padX * 2)) / (points.length - 1));
+  const y = (v) => height - padBottom - ((v - min) * (height - padTop - padBottom)) / span;
+  const line = points.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+  const last = points.length - 1;
+  const el = document.createElement('div');
+  el.className = 'chart';
+  el.innerHTML =
+    `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="From ${values[0]} to ${values[last]} ${unit}">` +
+    (target ? `<line x1="${padX}" x2="${width - padX}" y1="${y(target).toFixed(1)}" y2="${y(target).toFixed(1)}" class="spark-target"/>` : '') +
+    (points.length > 1 ? `<polyline points="${line}" class="spark-line"/>` : '') +
+    points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="${i === last ? 3.6 : 2.2}" class="spark-dot"/>`).join('') +
+    `<text x="${padX}" y="${height - 4}" class="chart-label">${points[0].label}</text>` +
+    `<text x="${width - padX}" y="${height - 4}" text-anchor="end" class="chart-label">${points[last].label}</text>` +
+    `<text x="${Math.min(width - padX, Math.max(padX + 14, x(last)))}" y="${Math.max(11, y(values[last]) - 8)}" text-anchor="end" class="chart-value">${values[last]}</text>` +
+    '</svg>';
+  return el;
+}
+
+export function clock(seconds) {
+  const s = Math.max(0, Math.round(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
